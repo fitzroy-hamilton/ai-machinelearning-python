@@ -1,4 +1,4 @@
-# Kernel SVM
+# SVM
 
 # Importer les librairies
 import numpy as np
@@ -22,7 +22,7 @@ X_test = sc.transform(X_test)
 
 # Construction du modèle
 from sklearn.svm import SVC
-classifier = SVC(kernel = 'rbf', random_state = 0)
+classifier = SVC(kernel = 'linear', random_state = 0)
 classifier.fit(X_train, y_train)
 
 # Faire de nouvelles prédictions

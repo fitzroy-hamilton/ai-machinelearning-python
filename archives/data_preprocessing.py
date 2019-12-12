@@ -1,13 +1,13 @@
 # Data Preprocessing
 
 # Importer les librairies
-import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 # Importer le dataset (ne pas oublier de parametrer le "console working 
 # directory")
 dataset = pd.read_csv('Data.csv')
+#print(dataset.head())
 # iloc prend deux parametres : nombre de lignes et nombre de colonnes
 # ":" signifie que l'on prend toutes les lignes ou colonnes du dataset
 # en faisant ":-1" on part du principe que la derniere colonne contient la 
@@ -26,13 +26,17 @@ imputer = Imputer(missing_values = 'NaN', strategy = 'mean', axis = 0)
 imputer.fit(X[:, 1:3])
 # on transforme la variable conformement a la strategie definie 
 X[:, 1:3] = imputer.transform(X[:, 1:3])
+print("Independent dataset X:")
+print(X)
+print("")
 
 # Gérer les variables catégoriques (ie variable non numerique continue)
 # ici dans notre dataset, les pays (3 categories) et purchase (2 categories)
 # Le but est d'encoder les variables catégoriques (en texte par exemple) en
 # variable numerique
 # Variable nominale (= non ordonnee) vs. ordinale (= ordonnee)
-# La class LabelEncoder permet de transformer du texte en valeur numérique
+# La class LabelEncoder permet de transformer du texte en valeur numérique 
+# (1, 2, 3, ...)
 # La class OneHotEncoder permet de spliter en plusieurs colonnes une colonne
 # contenant des valeurs numeriques (= pas de texte)
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
@@ -49,9 +53,12 @@ X[:, 0] = labelencoder_X.fit_transform(X[:, 0]) # country est la 1ere colonne
 # (0 pour la France, 1 pour Germany et 2 pour Spain), on aurait recréé une 
 # relation d'ordre entre les pays puisque 1 < 2 etc.
 # categorical_features correspond aux indices des colonnes a transformer
-onehotencoder = OneHotEncoder(categorical_features = [0]) 
+onehotencoder = OneHotEncoder(categorical_features = [0], dtype=int) 
+np.set_printoptions(suppress=True)
 X = onehotencoder.fit_transform(X).toarray()
-
+print("Independent dataset X apres gestion des variables categoriques:")
+print(X)
+print("")
 # pour la variable purchase on transforme juste les valeurs textuelles en 
 # valeurs numeriques
 labelencoder_y = LabelEncoder() 
@@ -86,13 +93,14 @@ from sklearn.preprocessing import StandardScaler
 # aux valeurs de x la valeur minimum de x le tout divisé par la soustraction
 # de la valeur maximum de x par la valeur minimum de x)
 sc = StandardScaler()
+#print(X_train)
 X_train = sc.fit_transform(X_train)
 # Grace la fonction train_test_split, le training set et le test set ont une
 # moyenne et un ecart-type similaire et une distribution similaire des valeurs
 # On n'a donc pas besoin de fitter sc à X_test puisqu'il est déjà fitté à 
 # X_train
 X_test = sc.transform(X_test)
-
+#print(X_train)
 # On n'applique par le feature scaling sur y (sorties) puisque dans ce 
 # dataset, les valeurs ont déjà été encodées (avec LabelEncoder) en 0 ou 1
 # ce qui est dans une echelle similaire aux variables de X (entrees).

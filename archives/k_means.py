@@ -1,13 +1,13 @@
 # K-Means
 
 # Importer les librairies
-import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
 # Importer le dataset
 dataset = pd.read_csv('Mall_Customers.csv')
 X = dataset.iloc[:, [3, 4]].values
+print(dataset.head())
 
 # Utiliser la méthode elbow pour trouver le nombre optimal de clusters
 from sklearn.cluster import KMeans
@@ -22,9 +22,10 @@ plt.xlabel('Nombre de clusters')
 plt.ylabel('WCSS')
 plt.show()
 
-# Construction du modèle
+# Construction du modèle avec le nombre optimal de clusters
+nb_clusters = 5
 from sklearn.cluster import KMeans
-kmeans = KMeans(n_clusters = 5, init = 'k-means++', random_state = 0)
+kmeans = KMeans(n_clusters = nb_clusters, init = 'k-means++', random_state = 0)
 y_kmeans = kmeans.fit_predict(X)
 
 # Visualiser les résultats

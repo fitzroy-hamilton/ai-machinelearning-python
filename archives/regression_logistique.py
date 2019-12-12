@@ -9,6 +9,7 @@ import pandas as pd
 dataset = pd.read_csv('Social_Network_Ads.csv')
 X = dataset.iloc[:, [2, 3]].values
 y = dataset.iloc[:, -1].values
+print(dataset.head())
 
 # Diviser le dataset entre le Training set et le Test set
 from sklearn.model_selection import train_test_split

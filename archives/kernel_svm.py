@@ -1,4 +1,4 @@
-# SVM
+# Kernel SVM
 
 # Importer les librairies
 import numpy as np
@@ -9,6 +9,7 @@ import pandas as pd
 dataset = pd.read_csv('Social_Network_Ads.csv')
 X = dataset.iloc[:, [2, 3]].values
 y = dataset.iloc[:, -1].values
+print(dataset.head())
 
 # Diviser le dataset entre le Training set et le Test set
 from sklearn.model_selection import train_test_split
@@ -22,7 +23,7 @@ X_test = sc.transform(X_test)
 
 # Construction du modèle
 from sklearn.svm import SVC
-classifier = SVC(kernel = 'linear', random_state = 0)
+classifier = SVC(kernel = 'rbf', random_state = 0)
 classifier.fit(X_train, y_train)
 
 # Faire de nouvelles prédictions
@@ -41,6 +42,7 @@ accuracy /= len(y_test)
 # Visualiser les résultats
 from matplotlib.colors import ListedColormap
 X_set, y_set = X_train, y_train
+
 X1, X2 = np.meshgrid(np.arange(start = X_set[:, 0].min() - 1, stop = X_set[:, 0].max() + 1, step = 0.01),
                      np.arange(start = X_set[:, 1].min() - 1, stop = X_set[:, 1].max() + 1, step = 0.01))
 plt.contourf(X1, X2, classifier.predict(np.array([X1.ravel(), X2.ravel()]).T).reshape(X1.shape),

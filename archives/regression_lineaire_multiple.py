@@ -9,6 +9,7 @@ import pandas as pd
 dataset = pd.read_csv('50_Startups.csv')
 X = dataset.iloc[:, :-1].values
 y = dataset.iloc[:, -1].values
+print(dataset.head())
 
 # Gerer les variables categoriques
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
@@ -16,7 +17,7 @@ labelencoder_X = LabelEncoder()
 X[:, 3] = labelencoder_X.fit_transform(X[:, 3])
 onehotencoder = OneHotEncoder(categorical_features = [3])
 X = onehotencoder.fit_transform(X).toarray()
-# on retire une colonne correspondant à la dummy variable que
+# on retire la derniere colonne correspondant à la dummy variable que
 # l'on retire pour assurer l'independance des variables
 X = X[:, 1:] 
 
@@ -37,4 +38,5 @@ y_pred = regressor.predict(X_test)
 # contrairement a une regression lineaire simple, on passe en parametre
 # a predict un tableau d'entrees correspondant aux multiples entrees de la
 # regression lineaire multiple
-regressor.predict(np.array([[1, 0, 130000, 140000, 300000]]))
+profit_prediction = regressor.predict(np.array([[1, 0, 130000, 40000, 100000]]))
+print(profit_prediction)
