@@ -3,7 +3,7 @@
 """
 Created on Tue Feb  9 21:23:49 2021
 
-@author: kama
+@author: Jeremy Levens
 """
 
 from sklearn.model_selection import GridSearchCV
@@ -12,7 +12,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-from sklearn.ensemble import (AdaBoostClassifier, RandomForestClassifier, 
+from sklearn.ensemble import (AdaBoostClassifier, RandomForestClassifier,
                               GradientBoostingClassifier, BaggingClassifier,
                               ExtraTreesClassifier, StackingClassifier)
 from sklearn.tree import DecisionTreeClassifier
@@ -21,20 +21,21 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neural_network import MLPRegressor
-from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor, 
-                              RandomForestRegressor, ExtraTreesRegressor, 
+from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor,
+                              RandomForestRegressor, ExtraTreesRegressor,
                               StackingRegressor)
 from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
 
-from sklearn.decomposition import (FastICA, IncrementalPCA, PCA, KernelPCA, 
+from sklearn.decomposition import (FastICA, IncrementalPCA, PCA, KernelPCA,
                                    SparsePCA, NMF)
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.neighbors import NeighborhoodComponentsAnalysis
-from sklearn.manifold import (TSNE, Isomap, SpectralEmbedding, 
+from sklearn.manifold import (TSNE, Isomap, SpectralEmbedding,
                               LocallyLinearEmbedding)
 import numpy as np
 import pandas as pd
 import math
+
 
 class ModelSelectionHelper:
 
@@ -59,46 +60,46 @@ class ModelSelectionHelper:
         }
         self.hyperparams_classif = {
             'SGDClassifier': {},
-            'KNeighborsClassifier': { 
-                'n_neighbors': [2, 4, 6, 8, 10, 12], 
-                'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'], 
-                'metric': ['euclidean', 'manhattan', 'chebyshev', 'minkowski'], 
+            'KNeighborsClassifier': {
+                'n_neighbors': [2, 4, 6, 8, 10, 12],
+                'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
+                'metric': ['euclidean', 'manhattan', 'chebyshev', 'minkowski'],
                 'leaf_size': [10, 20, 30, 40, 50, 60, 70, 100]
                 },
-            'DecisionTreeClassifier': { 
-                'criterion': ['gini', 'entropy'], 
-                'splitter': ['best', 'random'], 
+            'DecisionTreeClassifier': {
+                'criterion': ['gini', 'entropy'],
+                'splitter': ['best', 'random'],
                 'max_features': [None, 'auto', 'sqrt', 'log2']
                 },
             'GaussianNB': {},
             'SVC': [
                 {'kernel': ['linear'], 'C': np.logspace(0.1, 2, 3)},
                 {'kernel': ['poly'], 'C': np.logspace(0.1, 2, 3)},
-                {'kernel': ['rbf'], 'C': np.logspace(0.1, 2, 3), 
+                {'kernel': ['rbf'], 'C': np.logspace(0.1, 2, 3),
                  'gamma': [0.001, 0.0001]},
                 {'kernel': ['sigmoid'], 'C': np.logspace(0.1, 2, 3)}
             ],
-            'MultiLayerPerceptronClassifier': { 
-                'solver': ['lbfgs', 'sgd', 'adam'], 
-                'hidden_layer_sizes': [(150, 150)], 
-                'tol': [0.000001, 0.00001, 0.0001, 0.001], 
-                'max_iter': [500], 
-                'random_state': [42] 
+            'MultiLayerPerceptronClassifier': {
+                'solver': ['lbfgs', 'sgd', 'adam'],
+                'hidden_layer_sizes': [(150, 150)],
+                'tol': [0.000001, 0.00001, 0.0001, 0.001],
+                'max_iter': [500],
+                'random_state': [42]
                 },
-            'AdaBoostClassifier':  { 
-                'n_estimators': [32, 64, 128], 
-                'learning_rate': [0.1, 0.5, 1.0], 
+            'AdaBoostClassifier':  {
+                'n_estimators': [32, 64, 128],
+                'learning_rate': [0.1, 0.5, 1.0],
                 'algorithm': ['SAMME', 'SAMME.R']
                 },
-            'BaggingClassifier': { 'base_estimator': [KNeighborsClassifier()]},
-            'RandomForestClassifier': { 
-                'n_estimators': [32, 64, 128], 
+            'BaggingClassifier': {'base_estimator': [KNeighborsClassifier()]},
+            'RandomForestClassifier': {
+                'n_estimators': [32, 64, 128],
                 'criterion':  ['gini', 'entropy']
                 },
-            'ExtraTreesClassifier': { 'n_estimators': [32, 64, 128] },
-            'GradientBoostingClassifier': { 
-                'n_estimators': [32, 64, 128], 
-                'learning_rate': [0.1, 0.5, 1.0], 
+            'ExtraTreesClassifier': {'n_estimators': [32, 64, 128]},
+            'GradientBoostingClassifier': {
+                'n_estimators': [32, 64, 128],
+                'learning_rate': [0.1, 0.5, 1.0],
                 'criterion': ['friedman_mse', 'mse', 'mae']
                 },
             'StackingClassifier': {}
@@ -111,10 +112,10 @@ class ModelSelectionHelper:
             'Lasso': Lasso(alpha=0.1),
             'Ridge': Ridge(),
             'ElasticNet': ElasticNet(),
-            'AdaBoostRegressor': AdaBoostRegressor(), 
-            'BaggingRegressor': BaggingRegressor(), 
-            'RandomForestRegressor': RandomForestRegressor(), 
-            'ExtraTreesRegressor': ExtraTreesRegressor(), 
+            'AdaBoostRegressor': AdaBoostRegressor(),
+            'BaggingRegressor': BaggingRegressor(),
+            'RandomForestRegressor': RandomForestRegressor(),
+            'ExtraTreesRegressor': ExtraTreesRegressor(),
             'StackingRegressor': StackingRegressor(
                 [('SGD', LinearRegression()),
                  ('Tree', DecisionTreeRegressor(random_state=42)),
@@ -124,40 +125,40 @@ class ModelSelectionHelper:
         self.hyperparams_regress = {
             'Linear Regression': {},
             'SVR': [
-                {'kernel': ['linear'], 'C': np.logspace(0.1, 2, 3), 
+                {'kernel': ['linear'], 'C': np.logspace(0.1, 2, 3),
                  'epsilon': [0.1, 1]},
-                {'kernel': ['poly'], 'C': np.logspace(0.1, 2, 3), 
-                 'degree': [2, 3, 4], 
-                 'gamma': ['scale', 'auto', 0.001, 0.0001], 
+                {'kernel': ['poly'], 'C': np.logspace(0.1, 2, 3),
+                 'degree': [2, 3, 4],
+                 'gamma': ['scale', 'auto', 0.001, 0.0001],
                  'epsilon': [0.1, 1]},
-                {'kernel': ['rbf'], 'C': np.logspace(0.1, 2, 3), 
+                {'kernel': ['rbf'], 'C': np.logspace(0.1, 2, 3),
                  'gamma': ['scale', 'auto', 0.001], 'epsilon': [0.1, 1]},
-                {'kernel': ['sigmoid'], 'C': np.logspace(0.1, 2, 3), 
+                {'kernel': ['sigmoid'], 'C': np.logspace(0.1, 2, 3),
                  'gamma': ['scale', 'auto', 0.001], 'epsilon': [0.1, 1]}
             ],
-            'Decision Tree': { 
-                'criterion': ['mse', 'friedman_mse', 'mae', 'poisson'], 
-                'splitter': ['best', 'random'], 
+            'Decision Tree': {
+                'criterion': ['mse', 'friedman_mse', 'mae', 'poisson'],
+                'splitter': ['best', 'random'],
                 'max_features': [None, 'auto', 'sqrt', 'log2']
                 },
-            'MultiLayerPerceptronRegressor': { 
-                'solver': ['lbfgs', 'sgd', 'adam'], 
-                'hidden_layer_sizes': [(150, 150)], 
-                'tol': [0.000001, 0.00001, 0.0001, 0.001], 
-                'max_iter': [500], 
-                'random_state': [42] 
+            'MultiLayerPerceptronRegressor': {
+                'solver': ['lbfgs', 'sgd', 'adam'],
+                'hidden_layer_sizes': [(150, 150)],
+                'tol': [0.000001, 0.00001, 0.0001, 0.001],
+                'max_iter': [500],
+                'random_state': [42]
                 },
             'Lasso': {},
-            'Ridge': { 
-                'solver': ['svd', 'cholesky', 'lsqr', 'sparse_cg', 'saga'], 
+            'Ridge': {
+                'solver': ['svd', 'cholesky', 'lsqr', 'sparse_cg', 'saga'],
                 'alpha': [0.1, 1.0, 10.0]
                 },
-            'ElasticNet': { 
+            'ElasticNet': {
                 'l1_ratio': [0.1, 0.5, 1.0], 'alpha': [0.1, 1.0, 10.0]
                 },
-            'AdaBoostRegressor': {}, 
+            'AdaBoostRegressor': {},
             'BaggingRegressor': {},
-            'RandomForestRegressor': {}, 
+            'RandomForestRegressor': {},
             'ExtraTreesRegressor': {},
             'StackingRegressor': {}
         }
@@ -202,25 +203,25 @@ class ModelSelectionHelper:
             self.scoring = 'accuracy'
             self.models = self.models_dimrec
             self.params = self.hyperparams_dimrec
-            
+
         self.keys = self.models.keys()
         self.grid_searches = {}
         self.preprocessor = None
-        
+
     def fit(self, X, y, cv=3, n_jobs=-1, verbose=1, refit=True):
         print(" ")
-        print("Benchmarking estimators & hyperparameter optimization :")
+        print("Benchmarking estimators & hyperparameter optimization:")
         for key in self.keys:
             model = self.models[key]
             params = self.params[key]
-                        
+
             gs = GridSearchCV(model, params, cv=cv, n_jobs=n_jobs,
-                              verbose=verbose, scoring=self.scoring, 
+                              verbose=verbose, scoring=self.scoring,
                               refit=refit, return_train_score=True)
-            gs.fit(X,y)
+            gs.fit(X, y)
             self.grid_searches[key] = gs
-            print("- %s" % key, math.ceil(gs.best_score_*100)/100, 
-                  "after", len(gs.cv_results_['params']), "combinations")            
+            print("- %s" % key, math.ceil(gs.best_score_*100)/100,
+                  "after", len(gs.cv_results_['params']), "combinations")
         print(" ")
 
     def score_summary(self, sort_by='mean_score'):
@@ -232,50 +233,49 @@ class ModelSelectionHelper:
                  'mean_score': np.mean(scores),
                  'std_score': np.std(scores),
             }
-            return pd.Series({**params,**d})
+            return pd.Series({**params, **d})
 
         rows = []
         for k in self.grid_searches:
-# print(k, "- Best estimator:", self.grid_searches[k].best_estimator_)
-# print("- Best score: %.2f%%" % (self.grid_searches[k].best_score_*100))
-# print("- Best Params :", self.grid_searches[k].best_params_)
+            # print(k, "- Best estim:", self.grid_searches[k].best_estimator_)
+            # print("- Score: %.2f%" % (self.grid_searches[k].best_score_))
+            # print("- Best Params :", self.grid_searches[k].best_params_)
             params = self.grid_searches[k].cv_results_['params']
             scores = []
             for i in range(self.grid_searches[k].cv):
                 key = "split{}_test_score".format(i)
-                r = self.grid_searches[k].cv_results_[key]        
-                scores.append(r.reshape(len(params),1))
+                r = self.grid_searches[k].cv_results_[key]
+                scores.append(r.reshape(len(params), 1))
 
             all_scores = np.hstack(scores)
-            for p, s in zip(params,all_scores):
+            for p, s in zip(params, all_scores):
                 rows.append((row(k, s, p)))
 
         df = pd.concat(rows, axis=1).T.sort_values([sort_by], ascending=False)
 
-        columns = ['estimator', 'min_score', 'mean_score', 
+        columns = ['estimator', 'min_score', 'mean_score',
                    'max_score', 'std_score']
         columns = columns + [c for c in df.columns if c not in columns]
 
         return df[columns]
-    
+
     def get_best_model(self):
         best_estimator = ""
         best_score = 0
-        
+
         for k in self.grid_searches:
             if (self.grid_searches[k].best_score_ > best_score):
                 best_score = self.grid_searches[k].best_score_
                 best_estimator = k
-        
+
 #       optim_model = models[best_estimator]
 #       optim_model.set_params(**self.grid_searches[best_estimator].best_params_)
         optim_model = self.grid_searches[best_estimator].best_estimator_
-        
-        print(' ')
+
         print("Best model with %.2f%% : " % (best_score*100))
-        print('- ', optim_model)
+        print('-> ', optim_model)
         print(' ')
-        return optim_model
-    
+        return optim_model, best_score
+
     def get_scoring_method(self):
         return self.scoring
