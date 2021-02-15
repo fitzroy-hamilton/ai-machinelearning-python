@@ -25,7 +25,7 @@ from sklearn.ensemble import (AdaBoostRegressor, BaggingRegressor,
                               RandomForestRegressor, ExtraTreesRegressor,
                               StackingRegressor)
 from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
-
+from sklearn.cluster import KMeans
 from sklearn.decomposition import (FastICA, IncrementalPCA, PCA, KernelPCA,
                                    SparsePCA, NMF)
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -40,6 +40,7 @@ import math
 class ModelSelectionHelper:
 
     def __init__(self, ml_type):
+        self.ml_type = ml_type
         self.models_classif = {
             'SGDClassifier': SGDClassifier(),
             'KNeighborsClassifier': KNeighborsClassifier(),
@@ -162,6 +163,12 @@ class ModelSelectionHelper:
             'ExtraTreesRegressor': {},
             'StackingRegressor': {}
         }
+        self.models_cluster = {
+            'K-Means': KMeans(n_clusters=8)
+        }
+        self.hyperparams_cluster = {
+            'K-Means': {}
+        }
         self.models_dimrec = {
             'Fast ICA': FastICA(n_components=7),
             'Incremental PCA': IncrementalPCA(n_components=7, batch_size=200),
@@ -191,15 +198,19 @@ class ModelSelectionHelper:
             'LLE': {}
         }
 
-        if (ml_type == 'classification'):
+        if (self.ml_type == 'classification'):
             self.scoring = 'f1'
             self.models = self.models_classif
             self.params = self.hyperparams_classif
-        elif (ml_type == 'regression'):
+        elif (self.ml_type == 'regression'):
             self.scoring = 'r2'
             self.models = self.models_regress
             self.params = self.hyperparams_regress
-        elif (ml_type == 'dimensionality-reduction'):
+        elif (self.ml_type == 'clustering'):
+            self.scoring = None
+            self.models = self.models_cluster
+            self.params = self.hyperparams_cluster
+        elif (self.ml_type == 'dimensionality-reduction'):
             self.scoring = 'accuracy'
             self.models = self.models_dimrec
             self.params = self.hyperparams_dimrec
@@ -208,9 +219,8 @@ class ModelSelectionHelper:
         self.grid_searches = {}
         self.preprocessor = None
 
-    def fit(self, X, y, cv=3, n_jobs=-1, verbose=1, refit=True):
-        print(" ")
-        print("Benchmarking estimators & hyperparameter optimization:")
+    def gs(self, X, y, cv=3, n_jobs=-1, verbose=1, refit=True):
+        print('\n', "Benchmarking estimators & hyperparameter optimization:")
         for key in self.keys:
             model = self.models[key]
             params = self.params[key]
@@ -223,6 +233,28 @@ class ModelSelectionHelper:
             print("- %s" % key, math.ceil(gs.best_score_*100)/100,
                   "after", len(gs.cv_results_['params']), "combinations")
         print(" ")
+
+    def get_best_model(self):
+        if (self.ml_type == 'clustering'):
+            optim_model = self.models_cluster['K-Means']
+            return optim_model, None
+
+        best_score = 0
+        best_estimator = ""
+
+        for k in self.grid_searches:
+            if (self.grid_searches[k].best_score_ > best_score):
+                best_score = self.grid_searches[k].best_score_
+                best_estimator = k
+
+        optim_model = self.grid_searches[best_estimator].best_estimator_
+        print("Best model with %.2f%% : " % (best_score*100))
+        print('-> ', optim_model, '\n')
+
+        return optim_model, best_score
+
+    def get_scoring_method(self):
+        return self.scoring
 
     def score_summary(self, sort_by='mean_score'):
         def row(key, scores, params):
@@ -258,24 +290,3 @@ class ModelSelectionHelper:
         columns = columns + [c for c in df.columns if c not in columns]
 
         return df[columns]
-
-    def get_best_model(self):
-        best_estimator = ""
-        best_score = 0
-
-        for k in self.grid_searches:
-            if (self.grid_searches[k].best_score_ > best_score):
-                best_score = self.grid_searches[k].best_score_
-                best_estimator = k
-
-#       optim_model = models[best_estimator]
-#       optim_model.set_params(**self.grid_searches[best_estimator].best_params_)
-        optim_model = self.grid_searches[best_estimator].best_estimator_
-
-        print("Best model with %.2f%% : " % (best_score*100))
-        print('-> ', optim_model)
-        print(' ')
-        return optim_model, best_score
-
-    def get_scoring_method(self):
-        return self.scoring

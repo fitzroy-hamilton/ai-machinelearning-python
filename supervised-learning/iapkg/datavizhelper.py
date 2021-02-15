@@ -22,6 +22,8 @@ class DatavizHelper:
     def __init__(self, ml_type):
         warnings.filterwarnings("ignore")
         self.max_features = 25
+        self.plt_h = 6
+        self.plt_cols = 3
         sns.set_context("talk", font_scale=0.8)
         plt.rcParams.update({'font.size': 20})
         set_config(display='diagram')
@@ -40,12 +42,16 @@ class DatavizHelper:
 
         return dataset.describe(percentiles=perc, include=include)
 
-    def emptyValues(self, X, y):
-        plt.figure(figsize=(10, 6))
+    def emptyValues(self, X, y, verbose=False):
+        plt.figure(figsize=(9, 9), dpi=300, tight_layout=True)
+        plt.clf()
 
-        dataset = pd.concat([X.reset_index(drop=True),
-                             y.reset_index(drop=True)],
-                            axis=1, sort=False)
+        if (y is None):
+            dataset = X
+        else:
+            dataset = pd.concat([X.reset_index(drop=True),
+                                 y.reset_index(drop=True)],
+                                axis=1, sort=False)
         count_missing = dataset.isna().sum()
         percent_missing = dataset.isna().sum() * 100 / dataset.shape[0]
         should_drop = percent_missing >= 90
@@ -54,8 +60,9 @@ class DatavizHelper:
                                          'should_drop': should_drop})
         missing_value_df.sort_values('percent_missing', inplace=True,
                                      ascending=False)
-        print('Empty values analysis:')
-        print(missing_value_df)
+        if (verbose):
+            print('Empty values analysis:')
+            print(missing_value_df)
 
         cmap = sns.color_palette("Blues", as_cmap=True)
         ax = plt.axes()
@@ -66,7 +73,7 @@ class DatavizHelper:
 
     def distributionNumerical(self, X, y):
         distribdataset = pd.concat([X, y], axis=1, sort=False)
-        subdistribdataset = distribdataset.select_dtypes([np.number])
+        subdataset = distribdataset.select_dtypes([np.number])
 
         cmap = sns.color_palette("Blues", as_cmap=True)
         sns.set(style='white')
@@ -74,87 +81,103 @@ class DatavizHelper:
                           'axes.edgecolor': 'lightgrey'})
 
         i = 1
-        nblines = math.ceil(len(subdistribdataset.columns) / 2)
-        plt.figure(figsize=(14, nblines*5), tight_layout=True)
+        nblines = math.ceil(len(subdataset.columns) / self.plt_cols)
+        plt.figure(figsize=(35, nblines*self.plt_h), dpi=150, tight_layout=True)
+        plt.clf()
 
-        for feature in subdistribdataset:
-            plt.subplot(nblines, 2, i)
+        for feature in subdataset:
+            plt.subplot(nblines, self.plt_cols, i)
 
-            sns.histplot(subdistribdataset[feature], kde=True, palette=cmap)
+            sns.histplot(subdataset[feature], kde=True, palette=cmap)
             i = i + 1
 
         plt.show()
 
     def distributionCategorical(self, X, y):
         data = pd.concat([X, y], axis=1, sort=False)
-        subdistribdataset = data.select_dtypes('category')
+        subdataset = data.select_dtypes('category')
 
         i = 1
-        nblines = math.ceil(len(subdistribdataset.columns) / 2)
-        plt.figure(figsize=(14, nblines*5), tight_layout=True)
+        nblines = math.ceil(len(subdataset.columns) / self.plt_cols)
+        plt.figure(figsize=(35, nblines*self.plt_h), dpi=150, tight_layout=True)
+        plt.clf()
 
-        for feature in subdistribdataset:
+        for feature in subdataset:
             print(f'{feature :-<30} {data[feature].unique()}')
-            plt.subplot(nblines, 2, i)
+            plt.subplot(nblines, self.plt_cols, i)
 
             data[feature].value_counts().plot.pie(textprops={'fontsize': 16})
             i = i + 1
 
         plt.show()
 
-    def relationshipNumericalFeatureTarget(self, X, y):
-        data = pd.concat([X, y], axis=1, sort=False)
-        subdistribdataset = data.select_dtypes([np.number])
-
-        if (y.unique().size > self.max_features):
-            print('Too many target unique values')
+    def relationNumericalFeatureTarget(self, X, y):
+        if (y is None):
+            print('No target to compare with')
+            print(' ')
         else:
-            target_dataset = {}
-            for target in y.unique():
-                target_dataset[target] = data[data[data.columns[-1]] == target]
+            data = pd.concat([X, y], axis=1, sort=False)
+            subdataset = data.select_dtypes([np.number])
 
-            i = 1
-            nblines = math.ceil(len(subdistribdataset.columns) / 2)
-            plt.figure(figsize=(14, nblines*5), tight_layout=True)
-
-            for feature in subdistribdataset:
-                plt.subplot(nblines, 2, i)
-
+            if (y.unique().size > self.max_features):
+                print('Too many target unique values')
+            else:
+                target_data = {}
                 for target in y.unique():
-                    sns.distplot(target_dataset[target][feature], label=target)
-                plt.legend()
-                i = i + 1
+                    target_data[target] = data[data[data.columns[-1]] == target]
 
-            plt.show()
+                i = 1
+                nblines = math.ceil(len(subdataset.columns) / self.plt_cols)
+                plt.figure(figsize=(35, nblines*self.plt_h), dpi=150,
+                           tight_layout=True)
+                plt.clf()
 
-    def relationshipCategoricalFeatureTarget(self, X, y):
-        dataset = X
-        subdataset = dataset.select_dtypes('category')
+                for feature in subdataset:
+                    plt.subplot(nblines, self.plt_cols, i)
 
-        if (subdataset.size < 1):
-            print('No categorical feature to show')
-        elif (subdataset.columns.size > self.max_features):
-            print('Too many categorical features to show:', subdataset.size)
+                    for target in y.unique():
+                        sns.distplot(target_data[target][feature], label=target)
+                    plt.legend()
+                    i = i + 1
+
+                plt.show()
+
+    def relationCategoricalFeatureTarget(self, X, y):
+        if (y is None):
+            print('No target to compare with')
+            print(' ')
         else:
-            i = 1
-            nblines = math.ceil(len(subdataset.columns) / 2)
-            plt.figure(figsize=(14, nblines*5), tight_layout=True)
+            dataset = X
+            subdataset = dataset.select_dtypes('category')
 
-            for feature in subdataset:
-                plt.subplot(nblines, 2, i)
+            if (subdataset.size < 1):
+                print('No categorical feature to show')
+            elif (subdataset.columns.size > self.max_features):
+                print('Too many categorical features to show:', subdataset.size)
+            else:
+                i = 1
+                nblines = math.ceil(len(subdataset.columns) / self.plt_cols)
+                plt.figure(figsize=(35, nblines*self.plt_h), dpi=150,
+                           tight_layout=True)
+                plt.clf()
 
-                sns.countplot(x=feature, hue=y, data=dataset)
-                plt.legend()
-                i = i + 1
+                for feature in subdataset:
+                    plt.subplot(nblines, self.plt_cols, i)
 
-            plt.show()
+                    sns.countplot(x=feature, hue=y, data=dataset)
+                    plt.legend()
+                    i = i + 1
+
+                plt.show()
 
     def heatmap(self, X, y, mirrored=False):
         data = pd.concat([X, y], axis=1, sort=False)
         if (data.select_dtypes([np.number]).columns.size < self.max_features):
             corr = data.corr()
 
-            fig, ax = plt.subplots(figsize=(10, 10))
+            plt.figure(figsize=(12, 12), dpi=300, tight_layout=True)
+            plt.clf()
+            ax = plt.axes()
             colormap = sns.color_palette("RdBu_r", 7)
 
             dropSelf = None
@@ -217,12 +240,117 @@ class DatavizHelper:
         plt.legend()
         ax.set_ylim(ymin=0)
         ax.set_title('Learning curve')
+
         plt.show()
 
     def errorhist(self, y, y_pred):
         plt.figure(figsize=(10, 6), tight_layout=True)
+        plt.clf()
+
         err_hist = np.abs(y - y_pred)
         plt.xlabel('Error value')
         plt.ylabel('Quantity')
         plt.hist(err_hist, bins=50)
+
         plt.show()
+
+    def clusteringelbow(self, pca):
+        plt.figure(figsize=(10, 6), tight_layout=True)
+        plt.clf()
+        plt.plot(np.cumsum(pca.explained_variance_))
+        plt.xlabel('number of components')
+        plt.ylabel('cumulative explained variance')
+
+        plt.show()
+
+    def clustering(self, d, X, y_clusters, k_means_cluster_centers):
+        # Add the cluster vector to our DataFrame, X
+        dataset = X.copy()
+        dataset["cluster"] = y_clusters
+
+        plt.figure(figsize=(7, 7), dpi=300, tight_layout=True)
+        plt.clf()
+
+        plt.rc('axes', titlesize=10)
+        plt.rc('axes', labelsize=10)
+        plt.rc('xtick', labelsize=8)
+        plt.rc('ytick', labelsize=8)
+        plt.rc('legend', fontsize=8)
+        colors = ['#6e1e78', '#e05206', '#ffb612', '#d2e100', '#82be00',
+                  '#009aa6', '#0088ce']
+
+        if (d == 2):
+            self.clustering2D(dataset, k_means_cluster_centers, colors)
+        elif (d == 3):
+            self.clustering3D(dataset, k_means_cluster_centers, colors)
+
+        plt.legend(scatterpoints=1, ncol=2, markerscale=3.0)
+        plt.show()
+
+    def clustering2D(self, dataset, k_means_cluster_centers, colors):
+        ax = plt.axes()
+        ax.set(xlabel='PC1', ylabel='PC2')
+        ax.set_title('Clustering 2D')
+        n_clusters = len(k_means_cluster_centers)
+
+        # for each cluster we associate a color
+        for k, col in zip(range(n_clusters), colors):
+            cluster = dataset[dataset["cluster"] == k]
+            cluster_center = k_means_cluster_centers[k]
+            ax.plot(cluster['PC1_2d'],
+                    cluster['PC2_2d'],
+                    linewidth=0.25,
+                    alpha=0.5,
+                    color=col,
+                    linestyle='--',
+                    antialiased=True,
+                    animated=True,
+                    markerfacecolor=col,
+                    markeredgewidth=0,
+                    marker='.', label='Cluster '+str(k+1))
+            ax.plot(cluster_center[0], cluster_center[1], 'o',
+                    markerfacecolor=col,
+                    markeredgecolor='k',
+                    antialiased=True,
+                    animated=True,
+                    markersize=6)
+
+    def clustering3D(self, dataset, k_means_cluster_centers, colors):
+        ax = plt.axes(projection='3d')
+        ax.set(xlabel='PC1', ylabel='PC2', zlabel='PC3')
+        ax.set_title('Clustering 3D')
+        n_clusters = len(k_means_cluster_centers)
+
+        # for each cluster we associate a color
+        for k, col in zip(range(n_clusters), colors):
+            cluster = dataset[dataset["cluster"] == k]
+            cluster_center = k_means_cluster_centers[k]
+            ax.plot3D(cluster['PC1_3d'],
+                      cluster['PC2_3d'],
+                      cluster['PC3_3d'],
+                      linewidth=0.25,
+                      alpha=0.5,
+                      color=col,
+                      linestyle='--',
+                      antialiased=True,
+                      animated=True,
+                      markerfacecolor=col,
+                      markeredgewidth=0,
+                      marker='.', label='Cluster '+str(k+1))
+            ax.text(cluster_center[0],
+                    cluster_center[1],
+                    cluster_center[2],
+                    'Cluster '+str(k+1),
+                    fontsize=8,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    bbox=dict(facecolor='white', alpha=0.66))
+            ax.plot3D(cluster_center[0],
+                      cluster_center[1],
+                      cluster_center[2],
+                      'o',
+                      markerfacecolor=col,
+                      markeredgecolor='k',
+                      antialiased=True,
+                      animated=True,
+                      markersize=6)
