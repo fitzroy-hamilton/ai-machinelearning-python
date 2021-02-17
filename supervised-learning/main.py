@@ -12,6 +12,7 @@ import pandas as pd
 from sklearn import __version__
 from sklearn.datasets import fetch_openml
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 
 from iapkg.datavizhelper import DatavizHelper
 from iapkg.preprocessingpipelinehelper import PreprocessingPipelineHelper
@@ -56,74 +57,68 @@ def import_data(source, export_excel=False):
     return df
 
 
-def build_pipeline(ml_type, df, pipeline):
-    print('Columns of the dataset:', list(df.columns), '\n')
+def explore_data(datavizHelper, X_train, y_train, X_train_pp, y_train_pp):
+    datavizHelper.emptyValues(X_train_pp, y_train_pp)
+    datavizHelper.distributionNumerical(X_train, y_train)
+    datavizHelper.relationNumericalFeatureTarget(X_train_pp, y_train_pp)
+    datavizHelper.heatmap(X_train_pp, y_train_pp)
 
-    # Split between train and test dataset
-    from sklearn.model_selection import train_test_split
-    trainset, testset = train_test_split(df, test_size=0.2)
 
+def build_pipeline(ml_type, trainset, testset, pipeline):
     # Preprocessing
     preprocHelper = PreprocessingPipelineHelper(trainset, ml_type)
     X_train = preprocHelper.getX(trainset, ml_type)
     y_train = preprocHelper.getY(trainset, ml_type)
-    X_train_pp, y_train_pp = preprocHelper.preprocess(X_train, y_train,
-                                                      ml_type,
+    X_train_pp, y_train_pp = preprocHelper.preprocess(X_train, y_train, ml_type,
                                                       verbose=False)
-
     score = 0
     datavizHelper = DatavizHelper(ml_type)
     if (pipeline is None):
-        # Dataviz
-        datavizHelper.emptyValues(X_train_pp, y_train_pp)
-        datavizHelper.distributionNumerical(X_train, y_train)
-        # datavizHelper.distributionNumerical(X_train_pp, y_train_pp)
-        datavizHelper.relationNumericalFeatureTarget(X_train_pp, y_train_pp)
-        datavizHelper.heatmap(X_train_pp, y_train_pp)
+        # Exploratory Data Analysis (EDA)
+        explore_data(datavizHelper, X_train, y_train, X_train_pp, y_train_pp)
 
-        # Model selection performing a grid search
+        # FIXME Feature Engineering
+
+        # Model Selection
         modelSelectionHelper = ModelSelectionHelper(ml_type)
         if ((ml_type == 'classification') or (ml_type == 'regression')):
             modelSelectionHelper.gs(X_train_pp, y_train_pp, n_jobs=5, verbose=0)
+        elif (ml_type == 'clustering'):
+            # threshold set to 10% of required progress if we add a cluster
+            modelSelectionHelper.gs_cluster(X_train_pp, datavizHelper, 0.1)
         best_model, score = modelSelectionHelper.get_best_model()
 
-        # Pipeline
+        # Set up the Pipeline
         pipeline = Pipeline(steps=[
                         ('preprocessor', preprocHelper.preprocessor),
                         ('estimator', best_model)
                     ])
 
-    # Training
-    if ((ml_type == 'classification') or (ml_type == 'regression')):
-        pipeline.fit(X_train, y_train)
-    elif (ml_type == 'clustering'):  # FIXME
-        # FIXME CLUSTER SPECIFIC : mettre le PCA dans le preprocessor ?
-        # en prenant en entree X_train -> X_train_pp -> X_train_pp_reduced
-        # ou comme nouvelle step du pipeline entre preprocessor et estimator
-        X_train_pp_reduced2 = preprocHelper.PCAreduct(2, X_train_pp)
-        best_model2 = best_model
-        best_model2.fit(X_train_pp_reduced2)
-        y_clusters = best_model2.predict(X_train_pp_reduced2)
-        datavizHelper.clustering(2, X_train_pp_reduced2, y_clusters,
-                                 best_model2.cluster_centers_)
-        X_train_pp_reduced3 = preprocHelper.PCAreduct(3, X_train_pp)
-        best_model3 = best_model
-        best_model3.fit(X_train_pp_reduced3)
+    # Fitting
+    pipeline.fit(X_train, y_train)
 
     # Evaluation
     cols_to_drop = []
     if ((ml_type == 'classification') or (ml_type == 'regression')):
-        X_test = preprocHelper.getX(testset)
-        y_test = preprocHelper.getY(testset)
+        X_test = preprocHelper.getX(testset, ml_type)
+        y_test = preprocHelper.getY(testset, ml_type)
         evaluationHelper = EvaluationHelper(pipeline,
                                             preprocHelper,
                                             datavizHelper)
         cols_to_drop = evaluationHelper.evaluation(ml_type, X_test, y_test)
-    elif (ml_type == 'clustering'):  # FIXME
-        y_clusters = best_model3.predict(X_train_pp_reduced3)
-        datavizHelper.clustering(3, X_train_pp_reduced3, y_clusters,
-                                 best_model3.cluster_centers_)
 
+    # Visualization on training dataset
+    if (ml_type == 'clustering'):
+        # FIXME CLUSTER SPECIFIC : mettre le PCA dans le preprocessor ?
+        # en prenant en entree X_train -> X_train_pp -> X_train_pp_reduced
+        # ou comme nouvelle step du pipeline entre preprocessor et estimator
+        X_train_pp_reduced = preprocHelper.PCAreduct(3, X_train_pp)
+        best_model.fit(X_train_pp_reduced)
+        y_clusters = best_model.predict(X_train_pp_reduced)
+        datavizHelper.clustering(3, X_train_pp_reduced, y_clusters,
+                                 best_model.cluster_centers_)
+
+    preprocHelper.cleancache()
     return pipeline, score, cols_to_drop
 
 
@@ -149,6 +144,9 @@ def main(ml_type, datasource):
     # Import data
     df = import_data(datasource, export_excel=False)
 
+    # Split between train and test dataset
+    trainset, testset = train_test_split(df, test_size=0.2)
+
     # Define the preprocessing and find the best estimator to build pipeline
     pipeline = None
     cols_to_drop = []
@@ -159,7 +157,9 @@ def main(ml_type, datasource):
         print('*************')
         print('***', ml_type, '- ROUND #', i)
         print('*************')
-        pipeline, score, cols_to_drop = build_pipeline(ml_type, df, pipeline)
+        pipeline, score, cols_to_drop = build_pipeline(ml_type,
+                                                       trainset, testset,
+                                                       pipeline)
 
         if ((ml_type == 'classification') or (ml_type == 'regression')):
             print('\n', "*** RESULT: %.2f%%" % (score*100))

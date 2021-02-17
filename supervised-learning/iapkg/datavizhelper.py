@@ -23,7 +23,7 @@ class DatavizHelper:
         warnings.filterwarnings("ignore")
         self.max_features = 25
         self.plt_h = 6
-        self.plt_cols = 3
+        self.plt_cols = 2
         sns.set_context("talk", font_scale=0.8)
         plt.rcParams.update({'font.size': 20})
         set_config(display='diagram')
@@ -80,12 +80,14 @@ class DatavizHelper:
         sns.set_style(rc={'axes.spines.top': False, 'axes.spines.right': False,
                           'axes.edgecolor': 'lightgrey'})
 
-        i = 1
         nblines = math.ceil(len(subdataset.columns) / self.plt_cols)
-        plt.figure(figsize=(35, nblines*self.plt_h), dpi=150, tight_layout=True)
-        plt.clf()
-
+        i = 1
         for feature in subdataset:
+            if ((i - 1) % 6 == 0):
+                plt.figure(figsize=(10, 20),
+                           dpi=150, tight_layout=True)
+                plt.clf()
+
             plt.subplot(nblines, self.plt_cols, i)
 
             sns.histplot(subdataset[feature], kde=True, palette=cmap)
@@ -254,12 +256,24 @@ class DatavizHelper:
 
         plt.show()
 
-    def clusteringelbow(self, pca):
-        plt.figure(figsize=(10, 6), tight_layout=True)
+    def drawElbow(self, K_range, optimal_nb_cluster, inertia):
+        from scipy.interpolate import make_interp_spline
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        plt.figure(figsize=(9, 5), dpi=300, tight_layout=True)
         plt.clf()
-        plt.plot(np.cumsum(pca.explained_variance_))
-        plt.xlabel('number of components')
-        plt.ylabel('cumulative explained variance')
+
+        plt.xticks(K_range)
+        K_range_smoothed = np.linspace(1, K_range[-1], 50)
+        a_BSpline = make_interp_spline(K_range, inertia)
+        inertia_smoothed = a_BSpline(K_range_smoothed)
+
+        plt.plot(K_range_smoothed, inertia_smoothed)
+        plt.vlines(optimal_nb_cluster, 0, inertia[0],
+                   linestyles='dashed', label='optimal', colors='g')
+        plt.xlabel('# clusters')
+        plt.ylabel('Model cost (= inertia)')
 
         plt.show()
 
@@ -290,6 +304,7 @@ class DatavizHelper:
     def clustering2D(self, dataset, k_means_cluster_centers, colors):
         ax = plt.axes()
         ax.set(xlabel='PC1', ylabel='PC2')
+        ax.set(xlim=(-1.25, 1.25), ylim=(-1.25, 1.25))
         ax.set_title('Clustering 2D')
         n_clusters = len(k_means_cluster_centers)
 
@@ -318,6 +333,7 @@ class DatavizHelper:
     def clustering3D(self, dataset, k_means_cluster_centers, colors):
         ax = plt.axes(projection='3d')
         ax.set(xlabel='PC1', ylabel='PC2', zlabel='PC3')
+        ax.set(xlim=(-1.1, 1.1), ylim=(-1.1, 1.1), zlim=(-1.1, 1.1))
         ax.set_title('Clustering 3D')
         n_clusters = len(k_means_cluster_centers)
 

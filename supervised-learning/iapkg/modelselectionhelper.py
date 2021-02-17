@@ -164,7 +164,7 @@ class ModelSelectionHelper:
             'StackingRegressor': {}
         }
         self.models_cluster = {
-            'K-Means': KMeans(n_clusters=8)
+            'K-Means': KMeans()
         }
         self.hyperparams_cluster = {
             'K-Means': {}
@@ -218,6 +218,7 @@ class ModelSelectionHelper:
         self.keys = self.models.keys()
         self.grid_searches = {}
         self.preprocessor = None
+        self.best_cluster_model = None
 
     def gs(self, X, y, cv=3, n_jobs=-1, verbose=1, refit=True):
         print('\n', "Benchmarking estimators & hyperparameter optimization:")
@@ -234,10 +235,43 @@ class ModelSelectionHelper:
                   "after", len(gs.cv_results_['params']), "combinations")
         print(" ")
 
+    def get_optimal_nb_clusters(self, X, datavizHelper, threshold=0.05):
+        inertia = []
+        gaps = []
+        K_range = range(1, 20)
+        i = 0
+        for k in K_range:
+            model = KMeans(n_clusters=k).fit(X)
+            inertia.append(model.inertia_)
+            if (i == 0):
+                gaps.append(0)
+            else:
+                gaps.append((inertia[i] - inertia[i-1]) / inertia[i-1])
+            i = i + 1
+
+        # Calculate the optimal number of cluster (= increase the number of
+        # clusters won't decrease the inertia more than 'threshold' (e.g.: 0.05)
+        optimal_nb_cluster = 0
+        while (optimal_nb_cluster < len(gaps)):
+            optimal_nb_cluster = optimal_nb_cluster + 1
+            if (gaps[optimal_nb_cluster] > -threshold):
+                break
+
+        datavizHelper.drawElbow(K_range, optimal_nb_cluster, inertia)
+
+        return optimal_nb_cluster
+
+    def gs_cluster(self, X, datavizHelper, threshold):
+        optim_model = self.models_cluster['K-Means']
+        optimal_nb_cluster = self.get_optimal_nb_clusters(X,
+                                                          datavizHelper,
+                                                          threshold)
+        optim_model.set_params(n_clusters=optimal_nb_cluster)
+        self.best_cluster_model = optim_model
+
     def get_best_model(self):
         if (self.ml_type == 'clustering'):
-            optim_model = self.models_cluster['K-Means']
-            return optim_model, None
+            return self.best_cluster_model, None
 
         best_score = 0
         best_estimator = ""

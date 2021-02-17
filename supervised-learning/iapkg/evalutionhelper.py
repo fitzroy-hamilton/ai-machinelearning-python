@@ -64,7 +64,8 @@ class EvaluationHelper:
     def evaluation(self, ml_type, X_test, y_test):
         y_test_pred = self.pipeline.predict(X_test)
 
-        X_test_pp, y_test_pp = self.preprocHlp.preprocess(X_test, y_test)
+        X_test_pp, y_test_pp = self.preprocHlp.preprocess(X_test, y_test,
+                                                          ml_type)
         y_test_pred_pp = self.preprocHlp.preprocessY(y_test_pred, y_test.name)
 
         # Classification report

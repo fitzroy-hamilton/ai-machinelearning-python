@@ -18,6 +18,8 @@ from sklearn.decomposition import IncrementalPCA
 import pandas as pd
 
 from iapkg.emptycolumndropper import EmptyColumnDropper
+from tempfile import mkdtemp
+from shutil import rmtree
 
 
 class PreprocessingPipelineHelper:
@@ -26,6 +28,7 @@ class PreprocessingPipelineHelper:
                  cat_ord_feat=None, date_feat=None, obj_feat=None):
         X_data = self.getX(dataset, ml_type)
         self.preprocessor = None
+        self.cachedir = mkdtemp()
 
         self.int_feat, self.cont_feat, self.cat_nom_feat, self.cat_ord_feat, \
             self.date_feat, self.obj_feat = self.splitXByType(X_data,
@@ -51,7 +54,7 @@ class PreprocessingPipelineHelper:
             # ('discretizer', KBinsDiscretizer(encode='ordinal')),
             ('scaler', RobustScaler()),
             ('normalizer', Normalizer(norm='l2'))
-            ])
+            ], memory=self.cachedir)
 
         continuous_pipeline = Pipeline(steps=[
             ('customtransfo', EmptyColumnDropper(threshold=0.9)),
@@ -64,23 +67,28 @@ class PreprocessingPipelineHelper:
             #                              k=math.ceil(len(self.cont_feat)*0.66)
             #                              )
             #  )
-            ])
+            ], memory=self.cachedir)
 
         categorical_nominal_pipeline = Pipeline(steps=[
                 ('customtransfo', EmptyColumnDropper(threshold=0.9)),
                 ('missing-values', SimpleImputer(strategy='constant',
                                                  fill_value='missing')),
                 ('onehot', OneHotEncoder(handle_unknown='error',
-                                         drop='if_binary'))])
+                                         drop='if_binary'))
+                ], memory=self.cachedir)
 
         self.preprocessor = ColumnTransformer(
             transformers=[
                     ('Discrete Feat.', discrete_pipeline, self.int_feat),
                     ('Continuous Feat.', continuous_pipeline, self.cont_feat),
                     ('Categ. (nominal) Feat.', categorical_nominal_pipeline,
-                     self.cat_nom_feat)],
+                     self.cat_nom_feat)
+                    ],
             # ('Object Features', None, self.obj_feat)])
             remainder='drop')
+
+    def cleancache(self):
+        rmtree(self.cachedir)
 
     # Features:
     # - Numerical
@@ -94,6 +102,8 @@ class PreprocessingPipelineHelper:
                      date_feat, obj_feat):
         # FIXME : if params are not null, it overrides the line below
 
+        print('Columns of the dataset:', list(X.columns))
+
         ints = list(X.columns[X.dtypes == 'int64'])
         conts = list(X.columns[X.dtypes == 'float64'])
         cat_nom = list(X.columns[X.dtypes == 'category'])
@@ -101,12 +111,18 @@ class PreprocessingPipelineHelper:
         dates = list()
         objs = list(X.columns[X.dtypes == 'object'])
 
-        print('-> Discrete feat.:\t\t\t\t', ints)
-        print('-> Continuous feat.:\t\t\t\t', conts)
-        print('-> Categorical (nominal) feat.:\t', cat_nom)
-        print('-> Categorical (ordinal) feat.:\t', cat_ord)
-        print('-> Date/time feat.:\t\t\t\t', dates)
-        print('-> Object feat.:\t\t\t\t\t', objs)
+        if (len(ints) > 0):
+            print('-> Discrete feat.:\t\t\t\t', ints)
+        if (len(conts) > 0):
+            print('-> Continuous feat.:\t\t\t\t', conts)
+        if (len(cat_nom) > 0):
+            print('-> Categorical (nominal) feat.:\t', cat_nom)
+        if (len(cat_ord) > 0):
+            print('-> Categorical (ordinal) feat.:\t', cat_ord)
+        if (len(dates) > 0):
+            print('-> Date/time feat.:\t\t\t\t', dates)
+        if (len(objs) > 0):
+            print('-> Object feat.:\t\t\t\t\t', objs)
         print(' ')
 
         return ints, conts, cat_nom, cat_ord, dates, objs
