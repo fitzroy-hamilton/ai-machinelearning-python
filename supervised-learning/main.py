@@ -84,8 +84,8 @@ def build_pipeline(ml_type, trainset, testset, pipeline):
         if ((ml_type == 'classification') or (ml_type == 'regression')):
             modelSelectionHelper.gs(X_train_pp, y_train_pp, n_jobs=5, verbose=0)
         elif (ml_type == 'clustering'):
-            # threshold set to 10% of required progress if we add a cluster
-            modelSelectionHelper.gs_cluster(X_train_pp, datavizHelper, 0.1)
+            # threshold set to 7.5% of required progress if we add a cluster
+            modelSelectionHelper.gs_cluster(X_train_pp, datavizHelper, 0.075)
         best_model, score = modelSelectionHelper.get_best_model()
 
         # Set up the Pipeline

@@ -15,6 +15,12 @@ import seaborn as sns
 
 from sklearn import set_config
 from sklearn.metrics import plot_confusion_matrix
+from scipy.interpolate import make_interp_spline
+
+from matplotlib.patches import Rectangle
+from matplotlib.ticker import FuncFormatter
+from wordcloud import WordCloud
+from collections import Counter
 
 
 class DatavizHelper:
@@ -43,7 +49,7 @@ class DatavizHelper:
         return dataset.describe(percentiles=perc, include=include)
 
     def emptyValues(self, X, y, verbose=False):
-        plt.figure(figsize=(9, 9), dpi=300, tight_layout=True)
+        plt.figure(figsize=(9, 8), dpi=300, tight_layout=True)
         plt.clf()
 
         if (y is None):
@@ -177,7 +183,7 @@ class DatavizHelper:
         if (data.select_dtypes([np.number]).columns.size < self.max_features):
             corr = data.corr()
 
-            plt.figure(figsize=(12, 12), dpi=300, tight_layout=True)
+            plt.figure(figsize=(12, 11), dpi=300, tight_layout=True)
             plt.clf()
             ax = plt.axes()
             colormap = sns.color_palette("RdBu_r", 7)
@@ -188,7 +194,7 @@ class DatavizHelper:
                 dropSelf = np.zeros_like(corr)
                 dropSelf[np.triu_indices_from(dropSelf)] = True
 
-            sns.heatmap(corr, cmap=colormap, annot=True, fmt=".2f",
+            sns.heatmap(corr, cmap=colormap, annot=True, fmt=".1f",
                         mask=dropSelf)
             ax.set_title('Correlation between Numerical features')
             plt.show()
@@ -257,10 +263,6 @@ class DatavizHelper:
         plt.show()
 
     def drawElbow(self, K_range, optimal_nb_cluster, inertia):
-        from scipy.interpolate import make_interp_spline
-        import matplotlib.pyplot as plt
-        import numpy as np
-
         plt.figure(figsize=(9, 5), dpi=300, tight_layout=True)
         plt.clf()
 
@@ -370,3 +372,258 @@ class DatavizHelper:
                       antialiased=True,
                       animated=True,
                       markersize=6)
+
+    # Dataviz for Distribution of document word counts
+    def word_count_distribution(self, doc_lengths):
+        plt.figure(figsize=(16, 7), dpi=300)
+        plt.hist(doc_lengths, bins=1000, color='steelblue')
+        plt.text(750, 100, "Mean   :" + str(round(np.mean(doc_lengths))))
+        plt.text(750, 90, "Median :" + str(round(np.median(doc_lengths))))
+        plt.text(750, 80, "Stdev   :" + str(round(np.std(doc_lengths))))
+        plt.text(750, 70, "1%ile    :" + str(round(np.quantile(doc_lengths,
+                                                               q=0.01))))
+        plt.text(750, 60, "99%ile  :" + str(round(np.quantile(doc_lengths,
+                                                              q=0.99))))
+        plt.gca().set(xlim=(0, 1000),
+                      ylabel='Number of Documents',
+                      xlabel='Document Word Count')
+        plt.tick_params(size=16)
+        plt.xticks(np.linspace(0, 1000, 9))
+        plt.title('Distribution of Document Word Counts',
+                  fontdict=dict(size=22))
+        plt.show()
+
+    # Dataviz for Distribution of document word counts by Dominant topic
+    def dominant_topic_distribution(self, df_dominant_topic, mcolors):
+        cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+        fig, axes = plt.subplots(2, 2, figsize=(16, 14), dpi=300,
+                                 sharex=True,
+                                 sharey=True)
+
+        for i, ax in enumerate(axes.flatten()):
+            df_dominant_topic_sub = df_dominant_topic.\
+                loc[df_dominant_topic.Dominant_Topic == i, :]
+            doc_lengths = [len(d) for d in df_dominant_topic_sub.Text]
+            ax.hist(doc_lengths, bins=1000, color=cols[i])
+            ax.tick_params(axis='y', labelcolor=cols[i], color=cols[i])
+            sns.kdeplot(doc_lengths, color="black", shade=False, ax=ax.twinx())
+            ax.set(xlim=(0, 1000), xlabel='Document Word Count')
+            ax.set_ylabel('Number of Documents', color=cols[i])
+            ax.set_title('Topic: '+str(i), fontdict=dict(size=16,
+                                                         color=cols[i]))
+
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.90)
+        plt.xticks(np.linspace(0, 1000, 9))
+        fig.suptitle('Distribution of Document Word Counts by Dominant Topic',
+                     fontsize=22)
+        plt.show()
+
+    # Dataviz for Wordcloud of Top N words in each topic
+    def wordcloud(self, lda_model, stop_words, mcolors):
+        cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+        cloud = WordCloud(stopwords=stop_words,
+                          background_color='white',
+                          width=2500,
+                          height=1800,
+                          max_words=20,
+                          colormap='tab10',
+                          color_func=lambda *args, **kwargs: cols[i],
+                          prefer_horizontal=1.0)
+        topics = lda_model.show_topics(formatted=False)
+
+        fig, axes = plt.subplots(2, 2, figsize=(14, 14), dpi=300,
+                                 sharex=True, sharey=True)
+        for i, ax in enumerate(axes.flatten()):
+            fig.add_subplot(ax)
+            topic_words = dict(topics[i][1])
+            cloud.generate_from_frequencies(topic_words, max_font_size=300)
+            plt.gca().imshow(cloud)
+            plt.gca().set_title('Topic ' + str(i), fontdict=dict(size=16))
+            plt.gca().axis('off')
+        fig.suptitle('Word cloud', fontsize=22)
+        plt.subplots_adjust(wspace=0, hspace=0)
+        plt.axis('off')
+        plt.margins(x=0, y=0)
+        plt.tight_layout()
+        plt.show()
+
+    # Dataviz for Word count and importance of topic keywords
+    def word_count_importance_merged(self, lda_model, data_lemmatized, mcolors):
+        topics = lda_model.show_topics(formatted=False)
+        data_flat = [w for w_list in data_lemmatized for w in w_list]
+        counter = Counter(data_flat)
+        out = []
+        for i, topic in topics:
+            for word, weight in topic:
+                out.append([word, i, weight, counter[word]])
+        df = pd.DataFrame(out, columns=['word', 'topic_id', 'importance',
+                                        'word_count'])
+
+        fig, axes = plt.subplots(2, 2, figsize=(16, 10), sharey=True, dpi=300)
+        cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+        for i, ax in enumerate(axes.flatten()):
+            ax.bar(x='word', height="word_count",
+                   data=df.loc[df.topic_id == i, :],
+                   color=cols[i], width=0.5, alpha=0.3, label='Word Count')
+            ax_twin = ax.twinx()
+            ax_twin.bar(x='word', height="importance",
+                        data=df.loc[df.topic_id == i, :],
+                        color=cols[i], width=0.2, label='Weights')
+            ax.set_ylabel('Word Count', color=cols[i])
+            ax_twin.set_ylim(0, 0.030)
+            ax.set_ylim(0, 3500)
+            ax.set_title('Topic: ' + str(i), color=cols[i], fontsize=16)
+            ax.tick_params(axis='y', left=False)
+            ax.set_xticklabels(df.loc[df.topic_id == i, 'word'], rotation=30,
+                               horizontalalignment='right')
+            ax.legend(loc='upper left')
+            ax_twin.legend(loc='upper right')
+
+        fig.tight_layout(w_pad=2)
+        plt.rc('axes', titlesize=16)     # fontsize of the axes title
+        plt.rc('axes', labelsize=16)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=16)    # fontsize of the tick labels
+        plt.rc('ytick', labelsize=16)    # fontsize of the tick labels
+        plt.rc('legend', fontsize=16)    # legend fontsize
+        plt.rc('figure', titlesize=20)  # fontsize of the figure title
+        fig.suptitle('Word Count and Importance of Topic Keywords',
+                     fontsize=22, y=1.05)
+        plt.show()
+
+    # Dataviz for Word count and importance of topic keywords
+    def word_count_importance(self, lda_model, data_lemmatized, mcolors):
+        topics = lda_model.show_topics(formatted=False)
+        data_flat = [w for w_list in data_lemmatized for w in w_list]
+        counter = Counter(data_flat)
+        out = []
+        for i, topic in topics:
+            for word, weight in topic:
+                out.append([word, i, weight, counter[word]])
+        df = pd.DataFrame(out, columns=['word', 'topic_id', 'importance',
+                                        'word_count'])
+
+        cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+        i = 0
+        for top in topics:
+            fig = plt.figure(figsize=(16, 10), dpi=300, tight_layout=True)
+            ax = plt.axes()
+            ax.bar(x='word', height="word_count",
+                   data=df.loc[df.topic_id == i, :],
+                   color=cols[i], width=0.5, alpha=0.3, label='Word Count')
+            ax_twin = ax.twinx()
+            ax_twin.bar(x='word', height="importance",
+                        data=df.loc[df.topic_id == i, :],
+                        color=cols[i], width=0.2, label='Weights')
+            ax.set_ylabel('Word Count', color=cols[i])
+            ax_twin.set_ylim(0, 0.030)
+            ax.set_ylim(0, 3500)
+            ax.set_title('Topic: ' + str(i), color=cols[i], fontsize=16)
+            ax.tick_params(axis='y', left=False)
+            ax.set_xticklabels(df.loc[df.topic_id == i, 'word'], rotation=30,
+                               horizontalalignment='right')
+            ax.legend(loc='upper left')
+            ax_twin.legend(loc='upper right')
+
+            plt.rc('axes', titlesize=16)     # fontsize of the axes title
+            plt.rc('axes', labelsize=16)    # fontsize of the x and y labels
+            plt.rc('xtick', labelsize=16)    # fontsize of the tick labels
+            plt.rc('ytick', labelsize=16)    # fontsize of the tick labels
+            plt.rc('legend', fontsize=16)    # legend fontsize
+            plt.rc('figure', titlesize=20)  # fontsize of the figure title
+            fig.suptitle('Word Count and Importance of Topic Keywords',
+                         fontsize=22, y=1.05)
+            plt.show()
+            i = i + 1
+
+    # Dataviz for Topic Distribution by Dominant Topics
+    def topic_distribution_by_dominant_topics(self,
+                                              df_dominant_topic_in_each_doc,
+                                              df_topic_weightage_by_doc,
+                                              df_top5words,
+                                              mcolors):
+        cols = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+        fig = plt.figure(figsize=(16, 10), dpi=300, tight_layout=True)
+        ax = plt.axes()
+        ax.bar(x='Dominant_Topic', height="count",
+               data=df_dominant_topic_in_each_doc,
+               color=cols[0], width=0.5, alpha=0.3,
+               label='By Dominant Topic')
+        ax_twin = ax.twinx()
+        ax_twin.bar(x='index', height="count",
+                    data=df_topic_weightage_by_doc,
+                    color=cols[0], width=0.2, label='By Topic Weightage')
+        ax.set_ylabel('Number of docs', color=cols[0])
+        ax.tick_params(axis='y', left=False)
+        ax.set_xticks(range(df_dominant_topic_in_each_doc.Dominant_Topic.
+                            unique().__len__()))
+        tick_formatter = FuncFormatter(lambda x, pos: 'Topic ' + str(x) + '\n' +
+                                       df_top5words.loc[df_top5words.
+                                                        topic_id == x,
+                                                        'words'].values[0])
+        ax.xaxis.set_major_formatter(tick_formatter)
+        ax.legend(loc='upper left')
+        ax_twin.legend(loc='upper right')
+
+        plt.rc('axes', titlesize=16)     # fontsize of the axes title
+        plt.rc('axes', labelsize=16)    # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=16)    # fontsize of the tick labels
+        plt.rc('ytick', labelsize=16)    # fontsize of the tick labels
+        plt.rc('legend', fontsize=16)    # legend fontsize
+        plt.rc('figure', titlesize=20)  # fontsize of the figure title
+        fig.suptitle('Number of docs by Dominant Topic and Topic Weightage',
+                     fontsize=22, y=1.05)
+        plt.show()
+
+    # Dataviz for sentence Coloring of N Sentences based on topics for each word
+    def sentences_chart(self, lda_model, corpus, start, end, mcolors):
+        end = end + 2
+        corp = corpus[start:end]
+        mycolors = [color for name, color in mcolors.TABLEAU_COLORS.items()]
+
+        fig, axes = plt.subplots(end-start, 1, figsize=(20, (end-start)*0.95),
+                                 dpi=300)
+        axes[0].axis('off')
+        for i, ax in enumerate(axes):
+            if i > 0:
+                corp_cur = corp[i-1]
+                topic_percs, wordid_topics, wordid_phival = lda_model[corp_cur]
+                topic_percs_sorted = sorted(topic_percs, key=lambda x: (x[1]),
+                                            reverse=True)
+                word_dominanttopic = [(lda_model.id2word[wd], topic[0])
+                                      for wd, topic in wordid_topics]
+                ax.text(0.01, 0.5, "Doc " + str(i-1) +
+                        " (topic #" + str(topic_percs_sorted[0][0]) + "): ",
+                        verticalalignment='center',
+                        fontsize=18, color='black',
+                        transform=ax.transAxes,
+                        fontweight=700)
+
+                # Draw Rectange
+                ax.add_patch(Rectangle((0.0, 0.05), 0.99, 0.90,
+                                       fill=None, alpha=1,
+                                       color=mycolors[topic_percs_sorted[0][0]],
+                                       linewidth=2))
+
+                word_pos = 0.12
+                for j, (word, topics) in enumerate(word_dominanttopic):
+                    if j < 14:
+                        ax.text(word_pos, 0.5, word,
+                                horizontalalignment='left',
+                                verticalalignment='center',
+                                fontsize=18, color=mycolors[topics],
+                                transform=ax.transAxes, fontweight=700)
+                        # move the word to next iter
+                        word_pos += .009 * len(word)
+                        ax.axis('off')
+                ax.text(word_pos, 0.5, '. . .',
+                        horizontalalignment='left',
+                        verticalalignment='center',
+                        fontsize=18, color='black',
+                        transform=ax.transAxes)
+
+        plt.subplots_adjust(wspace=0, hspace=0)
+        plt.suptitle('Sentence Topic Coloring for Documents: ' + str(start) +
+                     ' to ' + str(end-2), fontsize=22, y=0.95, fontweight=700)
+        plt.tight_layout()
+        plt.show()
