@@ -22,6 +22,9 @@ from matplotlib.ticker import FuncFormatter
 from wordcloud import WordCloud
 from collections import Counter
 
+from bokeh.plotting import figure, show
+from bokeh.io import output_notebook
+
 
 class DatavizHelper:
 
@@ -627,3 +630,44 @@ class DatavizHelper:
                      ' to ' + str(end-2), fontsize=22, y=0.95, fontweight=700)
         plt.tight_layout()
         plt.show()
+
+    # Plot the Topic Clusters using Bokeh
+    def topic_clusters_bokeh(self, tsne_lda, topic_num, n_topics, mcolors):
+        output_notebook()
+        colsarray = mcolors.TABLEAU_COLORS.items()
+        cols = np.array([color for name, color in colsarray])
+        plot = figure(title="t-SNE cluster. of {} LDA Topics".format(n_topics),
+                      plot_width=900,
+                      plot_height=700)
+        plot.scatter(x=tsne_lda[:, 0], y=tsne_lda[:, 1], color=cols[topic_num])
+        show(plot)
+        plt.show()
+
+    def clustering_nlp(self, dataset, k_means_cluster_centers, colors):
+        ax = plt.axes()
+        ax.set(xlabel='PC1', ylabel='PC2')
+        ax.set(xlim=(-1.25, 1.25), ylim=(-1.25, 1.25))
+        ax.set_title('NLP Topic Modeling')
+        n_clusters = len(k_means_cluster_centers)
+
+        # for each cluster we associate a color
+        for k, col in zip(range(n_clusters), colors):
+            cluster = dataset[dataset["cluster"] == k]
+            cluster_center = k_means_cluster_centers[k]
+            ax.plot(cluster['PC1_2d'],
+                    cluster['PC2_2d'],
+                    linewidth=0.25,
+                    alpha=0.5,
+                    color=col,
+                    linestyle='--',
+                    antialiased=True,
+                    animated=True,
+                    markerfacecolor=col,
+                    markeredgewidth=0,
+                    marker='.', label='Cluster '+str(k+1))
+            ax.plot(cluster_center[0], cluster_center[1], 'o',
+                    markerfacecolor=col,
+                    markeredgecolor='k',
+                    antialiased=True,
+                    animated=True,
+                    markersize=6)

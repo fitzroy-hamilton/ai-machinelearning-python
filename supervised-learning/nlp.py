@@ -6,43 +6,27 @@ Created on Sat Feb 20 20:00:51 2021
 @author: kama
 """
 
-# !{sys.executable} -m spacy download en
-import re
 import numpy as np
 import pandas as pd
 from pprint import pprint
+import logging
+import warnings
 
 # Gensim
 import gensim
-import spacy
-import logging
-import warnings
 import gensim.corpora as corpora
-from gensim.utils import simple_preprocess
 from gensim.models import CoherenceModel
 
 # sklearn
 from sklearn.manifold import TSNE
 
 # visualization
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.ticker import FuncFormatter
-from bokeh.plotting import figure, show
-from bokeh.io import output_notebook
 import pyLDAvis.gensim
 
 from iapkg.datavizhelper import DatavizHelper
+from iapkg.nlphelper import NLPHelper
 
-# NLTK Stop words
-from nltk.corpus import stopwords
-stop_words = stopwords.words('english')
-stop_words.extend(['from', 'subject', 're', 'edu', 'use', 'not', 'would',
-                   'say', 'could', '_', 'be', 'know', 'good', 'go', 'get',
-                   'do', 'done', 'try', 'many', 'some', 'nice', 'thank',
-                   'think', 'see', 'rather', 'easy', 'easily', 'lot', 'lack',
-                   'make', 'want', 'seem', 'run', 'need', 'even', 'right',
-                   'line', 'even', 'also', 'may', 'take', 'come'])
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
@@ -59,97 +43,13 @@ print(df.shape)
 # (2361, 3)
 print(df.head(), '\n')
 
-
-# Convert sentence to words with an initial cleansing and tokenization using
-# Gensim simple_preprocess
-def sentence_to_words(sentences):
-    for sent in sentences:
-        sent = re.sub('\S*@\S*\s?', '', sent)  # remove emails
-        sent = re.sub('\s+', ' ', sent)  # remove newline chars
-        sent = re.sub("\'", "", sent)  # remove single quotes
-        # remove ponctuation (with deacc set to True)
-        sent = gensim.utils.simple_preprocess(str(sent), deacc=True)
-        yield(sent)
-
-
-# Remove Stopwords, Form Bigrams, Trigrams and Lemmatization
-# !python3 -m spacy download en  # run in terminal once
-def process_words(texts, stop_words=stop_words,
-                  allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
-    print('Start processing words...')
-
-    # Remove stopwords (le, la, les, ...)
-    texts = [[word for word in simple_preprocess(str(doc))
-              if word not in stop_words] for doc in texts]
-
-    # Form bigrams and trigrams
-    texts = [bigram_mod[doc] for doc in texts]
-    texts = [trigram_mod[bigram_mod[doc]] for doc in texts]
-
-    # Lemmatization (petits, petites, petit -> petit)
-    texts_out = []
-    nlp = spacy.load('en', disable=['parser', 'ner'])
-    for sentence in texts:
-        doc = nlp(" ".join(sentence))
-        texts_out.append([token.lemma_ for token in doc
-                          if token.pos_ in allowed_postags])
-
-    # Remove stopwords once more after lemmatization
-    texts_out = [[word for word in simple_preprocess(str(doc))
-                  if word not in stop_words] for doc in texts_out]
-
-    print('Example of text without stopword and lemmatized:', texts_out[:1])
-    print('Done.\n')
-    return texts_out
-
-
-# Get the main topic in each document concatenated to original text
-def format_topics_sentences(ldamodel, corpus, texts):
-    sent_topics_df = pd.DataFrame()
-    for i, row_list in enumerate(ldamodel[corpus]):
-        row = row_list[0] if ldamodel.per_word_topics else row_list
-        row = sorted(row, key=lambda x: (x[1]), reverse=True)
-
-        # Get the Dominant topic, Perc Contribution and Keywords for each doc
-        for j, (topic_num, prop_topic) in enumerate(row):
-            if j == 0:  # => dominant topic
-                wp = ldamodel.show_topic(topic_num)
-                topic_keywords = ", ".join([word for word, prop in wp])
-                sent_topics_df = sent_topics_df.append(
-                    pd.Series([int(topic_num),
-                               round(prop_topic, 4),
-                               topic_keywords]),
-                    ignore_index=True)
-            else:
-                break
-    sent_topics_df.columns = ['Dominant_Topic', 'Perc_Contrib',
-                              'Topic_Keywords']
-
-    # Add original text to the end of the output
-    contents = pd.Series(texts)
-    sent_topics_df = pd.concat([sent_topics_df, contents], axis=1)
-    return(sent_topics_df)
-
-
-def topics_per_document(model, corpus, start=0, end=1):
-    corpus_sel = corpus[start:end]
-    dominant_topics = []
-    topic_percentages = []
-    for i, corp in enumerate(corpus_sel):
-        topic_percs, wordid_topics, wordid_phivalues = model[corp]
-        dominant_topic = sorted(topic_percs, key=lambda x: x[1],
-                                reverse=True)[0][0]
-        dominant_topics.append((i, dominant_topic))
-        topic_percentages.append(topic_percs)
-    return(dominant_topics, topic_percentages)
-
-
 # Convert the 'content' column to list
 data = df.content.values.tolist()
 
 # Get an array (doc) of array (words) based on each doc's sentences
 # [['from', 'irwin', 'arnstein', 'subject', 're', 'recommendation', 'on', ...]]
-data_words = list(sentence_to_words(data))
+nlphlp = NLPHelper()
+data_words = list(nlphlp.sentence_to_words(data))
 print('First doc\'s sentences to words:')
 print(data_words[:1], '\n')
 
@@ -167,7 +67,7 @@ print('Trigram example:', trigram_mod[bigram_mod[data_words[0]]], '\n')
 # several times (which will be used to create the corpus with Term Document
 # Frequency)
 # [['worth', 'expire', 'ducati', 'much', 'ducatif', ...], ['article', ...]]
-data_lemmatized = process_words(data_words)
+data_lemmatized = nlphlp.process_words(data_words, bigram_mod, trigram_mod)
 
 # Create a common Dictionary for all the documents with Gensim. It encapsulates
 # the unique normalized words with their integer ids (position in the
@@ -228,18 +128,13 @@ coherence_model_lda = CoherenceModel(model=lda_model, texts=data_lemmatized,
 # print('Coherence Score: ', coherence_lda, '\n')
 
 # Get the main topic in each document concatenated to original text
-df_topic_sents_keywords = format_topics_sentences(ldamodel=lda_model,
-                                                  corpus=corpus,
-                                                  texts=data_lemmatized)
+df_topic_sents_keywords = nlphlp.format_topics_sentences(ldamodel=lda_model,
+                                                         corpus=corpus,
+                                                         texts=data_lemmatized)
 df_dominant_topic = df_topic_sents_keywords.reset_index()
-df_dominant_topic.columns = ['Document_No',
-                             'Dominant_Topic',
-                             'Topic_Perc_Contrib',
-                             'Keywords',
-                             'Text']
-print('Dominant topics:')
-print(df_dominant_topic.head(10))
-print('\n')
+df_dominant_topic.columns = ['Document_No', 'Dominant_Topic',
+                             'Topic_Perc_Contrib', 'Keywords', 'Text']
+print('Dominant topics:', df_dominant_topic.head(10), '\n')
 
 pd.options.display.max_colwidth = 100
 sent_topics_sorteddf_mallet = pd.DataFrame()
@@ -248,22 +143,18 @@ for i, grp in sent_topics_outdf_grpd:
     sent_topics_sorteddf_mallet = pd.concat([sent_topics_sorteddf_mallet,
                                              grp.sort_values(['Perc_Contrib'],
                                                              ascending=False)
-                                             .head(1)],
-                                            axis=0)
+                                             .head(1)], axis=0)
 
 sent_topics_sorteddf_mallet.reset_index(drop=True, inplace=True)
-sent_topics_sorteddf_mallet.columns = ['Topic_Num',
-                                       "Topic_Perc_Contrib",
-                                       "Keywords",
-                                       "Representative Text"]
-print('Main dominant topics:')
-print(sent_topics_sorteddf_mallet.head(10))
-print('\n')
+sent_topics_sorteddf_mallet.columns = ['Topic_Num', "Topic_Perc_Contrib",
+                                       "Keywords", "Representative Text"]
+print('Main dominant topics:', sent_topics_sorteddf_mallet.head(10), '\n')
 
 doc_lengths = [len(d) for d in df_dominant_topic.Text]
 
-dominant_topics, topic_percentages = topics_per_document(model=lda_model,
-                                                         corpus=corpus, end=-1)
+dominant_topics, topic_percentages = nlphlp.topics_per_document(model=lda_model,
+                                                                corpus=corpus,
+                                                                end=-1)
 
 # Distribution of Dominant Topics in Each Document
 df = pd.DataFrame(dominant_topics, columns=['Document_Id', 'Dominant_Topic'])
@@ -289,8 +180,8 @@ df_top5words.reset_index(level=0, inplace=True)
 # Dataviz
 datavizHelper = DatavizHelper('nlp')
 datavizHelper.word_count_distribution(doc_lengths)
-datavizHelper.dominant_topic_distribution(df_dominant_topic, mcolors)
-datavizHelper.wordcloud(lda_model, stop_words, mcolors)
+# datavizHelper.dominant_topic_distribution(df_dominant_topic, mcolors)
+datavizHelper.wordcloud(lda_model, nlphlp.get_stop_words(), mcolors)
 # datavizHelper.word_count_importance_merged(lda_model, data_lemmatized,mcolors)
 datavizHelper.word_count_importance(lda_model, data_lemmatized, mcolors)
 datavizHelper.sentences_chart(lda_model, corpus, 0, 11, mcolors)
@@ -305,30 +196,38 @@ vis
 print(vis)
 
 # Get topic weights and dominant topics
-# Get topic weights
 topic_weights = []
 for i, row_list in enumerate(lda_model[corpus]):
     topic_weights.append([w for i, w in row_list[0]])
 
 # Array of topic weights
-arr = pd.DataFrame(topic_weights).fillna(0).values
-
-# Keep the well separated points (optional)
-arr = arr[np.amax(arr, axis=1) > 0.35]
-
+arr_topic_weights = pd.DataFrame(topic_weights).fillna(0).values
+# Keep the well separated points (opt.)
+arr_topic_weights = arr_topic_weights[np.amax(arr_topic_weights, axis=1) > 0.35]
 # Dominant topic number in each doc
-topic_num = np.argmax(arr, axis=1)
+topic_num = np.argmax(arr_topic_weights, axis=1)
 
 # tSNE Dimension Reduction
 tsne_model = TSNE(n_components=2, verbose=1, random_state=0, angle=.99,
                   init='pca')
-tsne_lda = tsne_model.fit_transform(arr)
+tsne_lda = tsne_model.fit_transform(arr_topic_weights)
+# X = arr_topic_weights
+# Y = tsne_lda
 
-# Plot the Topic Clusters using Bokeh
-output_notebook()
+tsne_df = pd.DataFrame({'X': tsne_lda[:, 0],
+                        'Y': tsne_lda[:, 1],
+                        'topic': topic_num})
+print('TNSE:')
+pprint(tsne_df.head(10))
+print('\n')
+import seaborn as sns
+
+sns.scatterplot(x="X", y="Y",
+                hue="topic",
+                palette=['red', 'orange', 'blue', 'green'],
+                legend='full',
+                data=tsne_df)
+
 n_topics = 4
-mycolors = np.array([color for name, color in mcolors.TABLEAU_COLORS.items()])
-plot = figure(title="t-SNE Clustering of {} LDA Topics".format(n_topics),
-              plot_width=900, plot_height=700)
-plot.scatter(x=tsne_lda[:, 0], y=tsne_lda[:, 1], color=mycolors[topic_num])
-show(plot)
+
+datavizHelper.topic_clusters_bokeh(tsne_lda, topic_num, n_topics, mcolors)
