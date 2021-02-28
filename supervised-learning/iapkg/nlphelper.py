@@ -17,63 +17,116 @@ from gensim.utils import simple_preprocess
 import spacy
 
 # NLTK Stop words
+from nltk.tokenize.regexp import regexp_tokenize
+from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+
+from alive_progress import alive_bar
+from tqdm import tqdm
 
 
 class NLPHelper:
-    def __init__(self):
+    def __init__(self, stop_words_extension=[]):
         self.nlp = None
-        self.stop_words = stopwords.words('english')
-        self.stop_words.extend([
-            'from', 'subject', 're', 'edu', 'use', 'not', 'would', 'take',
-            'say', 'could', '_', 'be', 'know', 'good', 'go', 'get', 'come',
-            'do', 'done', 'try', 'many', 'some', 'nice', 'thank', 'may', 'also',
-            'think', 'see', 'rather', 'easy', 'easily', 'lot', 'lack', 'even',
-            'make', 'want', 'seem', 'run', 'need', 'even', 'right', 'line'])
+        self.stop_words = stopwords.words('french')
+        self.stop_words.extend(stop_words_extension)
 
     def get_stop_words(self):
         return self.stop_words
 
-    # Convert sentence to words with an initial cleansing and tokenization using
-    # Gensim simple_preprocess
-    def sentence_to_words(self, sentences):
-        for sent in sentences:
-            sent = re.sub('\S*@\S*\s?', '', sent)  # remove emails
-            sent = re.sub('\s+', ' ', sent)  # remove newline chars
-            sent = re.sub("\'", "", sent)  # remove single quotes
-            # remove ponctuation (with deacc set to True)
-            sent = gensim.utils.simple_preprocess(str(sent), deacc=True)
-            yield(sent)
+    # performs a few cleaning steps to remove non-alphabetic characters
+    def clean_text(self, text):
+        # replace new line, carriage return and tabulation with space
+        try:
+            text= str(text)
+            text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+        except AttributeError:
+            print('ERREUR:', text, text.dtype)
+        text = text.lower()
+
+        # replace the numbers and punctuation with space
+        punc_list = '!"#$%&()*+,-.©–/:;<=>?@[\\]^_{}~' + '0123456789' + "'’"
+
+        # replace accentuation with simple characters
+        # FIXME: remove accents
+
+        t = str.maketrans(dict.fromkeys(punc_list, ' '))
+        text = text.translate(t)
+
+        return text
+
+    def custom_tokenizer(self, text, tokenizer='nltk_regexp'):
+        text = self.clean_text(text)
+
+        if (tokenizer == 'nltk'):
+            tokens = word_tokenize(text)
+        elif (tokenizer == 'gensim'):
+            tokens = gensim.utils.simple_preprocess(str(tokens), deacc=True)
+        else:
+            tokens = regexp_tokenize(text, pattern = '\s+', gaps = True)
+
+        for token in tokens:
+            if len(token) > 512:
+                print('TOKER > 512', token)
+                token = token[:512]
+
+        return tokens
+
+    # Convert docs to tokenized docs with an initial cleansing and tokenization
+    def tokenize_docs(self, docs):
+        print('Start tokenizing docs...')
+        for doc in docs:
+            doc = self.custom_tokenizer(doc)
+            yield(doc)
+        print('Docs tokenized.')
 
     # Remove Stopwords, Form Bigrams, Trigrams and Lemmatization
     # python3 -m spacy download en  # run in terminal once
-    def process_words(self, texts,
-                      bigram_mod, trigram_mod,
-                      allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
-        print('Start processing words...')
-
+    # REMOVE STOPWORDS
+    def lemmatize_docs(self, docs,
+                       allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
+        print('Start lemmatizing docs...')
+        print('\tRemoving stop words...')
         # Remove stopwords (le, la, les, ...)
-        texts = [[word for word in simple_preprocess(str(doc))
-                  if word not in self.stop_words] for doc in texts]
+        docs = [[word for word in simple_preprocess(str(doc))
+                 if word not in self.stop_words] for doc in docs]
 
-        # Form bigrams and trigrams
-        texts = [bigram_mod[doc] for doc in texts]
-        texts = [trigram_mod[bigram_mod[doc]] for doc in texts]
+        # Form bigrams and trigrams (higher threshold fewer phrases)
+        # Après un découpage en mots, on ne considère plus l’ordre avec une
+        # approche bag-of-words. Si l’information contenu par l’ordre des mots
+        # s’avère importante, il faut considérer un découpage en couple de mots
+        # (bi-grammes), triplets de mots (3-grammes)...
+        print('\tForming bigrams and trigrams...')
+        bigram = gensim.models.Phrases(docs, min_count=5, threshold=100)
+        trigram = gensim.models.Phrases(bigram[docs], threshold=100)
+        bigram_mod = gensim.models.phrases.Phraser(bigram)
+        trigram_mod = gensim.models.phrases.Phraser(trigram)
+        # print('Trigram example:', trigram_mod[bigram_mod[docs[0]]], '\n')
+        docs = [bigram_mod[doc] for doc in docs]
+        docs = [trigram_mod[bigram_mod[doc]] for doc in docs]
 
         # Lemmatization (petits, petites, petit -> petit)
+        print('\tLemmatizing...')
         texts_out = []
-        nlp = spacy.load('en', disable=['parser', 'ner'])
-        for sentence in texts:
-            doc = nlp(" ".join(sentence))
-            texts_out.append([token.lemma_ for token in doc
-                              if token.pos_ in allowed_postags])
+        # pip install --upgrade spacy # to get v3.0
+        # python -m spacy download fr_dep_news_trf
+        # fr_dep_news_trf = French transformer pipeline (camembert-base).
+        # Components: transformer, morphologizer, parser, attribute_ruler,
+        # lemmatizer.
+        nlp = spacy.load('fr_dep_news_trf', disable=['parser', 'ner'])
+        with alive_bar(len(docs), force_tty=1, spinner='ball_bouncing') as bar:
+            for sentence in docs:
+                doc = nlp(" ".join(sentence))
+    #            spacy.displacy.render(doc, style='ent', jupyter=True)
+                texts_out.append([token.lemma_ for token in doc
+                                  if token.pos_ in allowed_postags])
+                bar()
 
         # Remove stopwords once more after lemmatization
+        print('\tRemoving stop words after lemmatization...')
         texts_out = [[word for word in simple_preprocess(str(doc))
                       if word not in self.stop_words] for doc in texts_out]
-
-        print('Example of text without stopword and lemmatized:', texts_out[:1])
-        print('Done.\n')
+        print('Docs lemmatized.')
         return texts_out
 
     # Get the main topic in each document concatenated to original text

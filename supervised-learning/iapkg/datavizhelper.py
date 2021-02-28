@@ -282,7 +282,7 @@ class DatavizHelper:
 
         plt.show()
 
-    def clustering(self, d, X, y_clusters, k_means_cluster_centers):
+    def clustering(self, d, X, y_clusters, k_means_centroids=None):
         # Add the cluster vector to our DataFrame, X
         dataset = X.copy()
         dataset["cluster"] = y_clusters
@@ -298,25 +298,26 @@ class DatavizHelper:
         colors = ['#6e1e78', '#e05206', '#ffb612', '#d2e100', '#82be00',
                   '#009aa6', '#0088ce']
 
+        nb_clus = len(y_clusters)
         if (d == 2):
-            self.clustering2D(dataset, k_means_cluster_centers, colors)
+            self.clustering2D(dataset, colors, nb_clus, k_means_centroids)
         elif (d == 3):
-            self.clustering3D(dataset, k_means_cluster_centers, colors)
+            self.clustering3D(dataset, colors, nb_clus, k_means_centroids)
 
         plt.legend(scatterpoints=1, ncol=2, markerscale=3.0)
         plt.show()
 
-    def clustering2D(self, dataset, k_means_cluster_centers, colors):
+    def clustering2D(self, dataset, colors, nb_clus, k_means_centroids=None):
         ax = plt.axes()
         ax.set(xlabel='PC1', ylabel='PC2')
-        ax.set(xlim=(-1.25, 1.25), ylim=(-1.25, 1.25))
+#        ax.set(xlim=(-1.25, 1.25), ylim=(-1.25, 1.25))
         ax.set_title('Clustering 2D')
-        n_clusters = len(k_means_cluster_centers)
+        n_clusters = nb_clus
+#        n_clusters = len(k_means_cluster_centers)
 
         # for each cluster we associate a color
         for k, col in zip(range(n_clusters), colors):
             cluster = dataset[dataset["cluster"] == k]
-            cluster_center = k_means_cluster_centers[k]
             ax.plot(cluster['PC1_2d'],
                     cluster['PC2_2d'],
                     linewidth=0.25,
@@ -328,24 +329,26 @@ class DatavizHelper:
                     markerfacecolor=col,
                     markeredgewidth=0,
                     marker='.', label='Cluster '+str(k+1))
-            ax.plot(cluster_center[0], cluster_center[1], 'o',
-                    markerfacecolor=col,
-                    markeredgecolor='k',
-                    antialiased=True,
-                    animated=True,
-                    markersize=6)
+            if (k_means_centroids is not None):
+                cluster_center = k_means_centroids[k]
+                ax.plot(cluster_center[0], cluster_center[1], 'o',
+                        markerfacecolor=col,
+                        markeredgecolor='k',
+                        antialiased=True,
+                        animated=True,
+                        markersize=6)
 
-    def clustering3D(self, dataset, k_means_cluster_centers, colors):
+    def clustering3D(self, dataset, colors, nb_clus, k_means_centroids=None):
         ax = plt.axes(projection='3d')
         ax.set(xlabel='PC1', ylabel='PC2', zlabel='PC3')
         ax.set(xlim=(-1.1, 1.1), ylim=(-1.1, 1.1), zlim=(-1.1, 1.1))
         ax.set_title('Clustering 3D')
-        n_clusters = len(k_means_cluster_centers)
+        n_clusters = nb_clus
+#        n_clusters = len(k_means_cluster_centers)
 
         # for each cluster we associate a color
         for k, col in zip(range(n_clusters), colors):
             cluster = dataset[dataset["cluster"] == k]
-            cluster_center = k_means_cluster_centers[k]
             ax.plot3D(cluster['PC1_3d'],
                       cluster['PC2_3d'],
                       cluster['PC3_3d'],
@@ -358,23 +361,26 @@ class DatavizHelper:
                       markerfacecolor=col,
                       markeredgewidth=0,
                       marker='.', label='Cluster '+str(k+1))
-            ax.text(cluster_center[0],
-                    cluster_center[1],
-                    cluster_center[2],
-                    'Cluster '+str(k+1),
-                    fontsize=8,
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    bbox=dict(facecolor='white', alpha=0.66))
-            ax.plot3D(cluster_center[0],
-                      cluster_center[1],
-                      cluster_center[2],
-                      'o',
-                      markerfacecolor=col,
-                      markeredgecolor='k',
-                      antialiased=True,
-                      animated=True,
-                      markersize=6)
+
+            if (k_means_centroids is not None):
+                cluster_center = k_means_centroids[k]
+                ax.text(cluster_center[0],
+                        cluster_center[1],
+                        cluster_center[2],
+                        'Cluster '+str(k+1),
+                        fontsize=8,
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        bbox=dict(facecolor='white', alpha=0.66))
+                ax.plot3D(cluster_center[0],
+                          cluster_center[1],
+                          cluster_center[2],
+                          'o',
+                          markerfacecolor=col,
+                          markeredgecolor='k',
+                          antialiased=True,
+                          animated=True,
+                          markersize=6)
 
     # Dataviz for Distribution of document word counts
     def word_count_distribution(self, doc_lengths):
@@ -519,8 +525,8 @@ class DatavizHelper:
                         data=df.loc[df.topic_id == i, :],
                         color=cols[i], width=0.2, label='Weights')
             ax.set_ylabel('Word Count', color=cols[i])
-            ax_twin.set_ylim(0, 0.030)
-            ax.set_ylim(0, 3500)
+#            ax_twin.set_ylim(0, 0.030)
+#            ax.set_ylim(0, 3500)
             ax.set_title('Topic: ' + str(i), color=cols[i], fontsize=16)
             ax.tick_params(axis='y', left=False)
             ax.set_xticklabels(df.loc[df.topic_id == i, 'word'], rotation=30,
@@ -632,6 +638,8 @@ class DatavizHelper:
         plt.show()
 
     # Plot the Topic Clusters using Bokeh
+    # jupyter labextension install @jupyter-widgets/jupyterlab-manager
+    # jupyter labextension install @bokeh/jupyter_bokeh
     def topic_clusters_bokeh(self, tsne_lda, topic_num, n_topics, mcolors):
         output_notebook()
         colsarray = mcolors.TABLEAU_COLORS.items()
@@ -641,7 +649,6 @@ class DatavizHelper:
                       plot_height=700)
         plot.scatter(x=tsne_lda[:, 0], y=tsne_lda[:, 1], color=cols[topic_num])
         show(plot)
-        plt.show()
 
     def clustering_nlp(self, dataset, k_means_cluster_centers, colors):
         ax = plt.axes()
